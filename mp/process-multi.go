@@ -85,7 +85,7 @@ func processFile(dataPath string, numTokens int, resultsPath string) {
 		log.Fatal(err)
 	}
 	defer finals.Close()
-	summary := fmt.Sprintf("state channel = %d \n total = %d", stateChannelCount, totalCount)
+	summary := fmt.Sprintf("\nstate channel = %d \n total = %d", stateChannelCount, totalCount)
 	fmt.Println("\nSuummary")
 	fmt.Println(summary)
 	finals.WriteString(summary)
@@ -129,26 +129,36 @@ func executeQfabCLI(formattedLine string, outFile *os.File) (int, int) {
 
 	outputStr := string(output)
 	if strings.Contains(outputStr, "legacy token: ") {
-		outFile.WriteString(outputStr + "\n")
+		lines := strings.Split(outputStr, "\n")
+		fileEntry := ""
+		for _, line := range lines {
+			if strings.Contains(line, "MAPPED PREFIX") {
+				fileEntry = fmt.Sprintf("legacy token: MAPPED PREFIX=%s\n", strings.TrimSpace(strings.TrimPrefix(line, "MAPPED PREFIX")))
+				break
+			}
+		}
+		outFile.WriteString(fileEntry)
 		return 0, 1
 	}
 
-	splitOut := strings.Join(strings.Split(outputStr, "\n")[2:], "")
-	postSplit := strings.Split(splitOut, "TOKEN")
-
-	prefixInfo := strings.Split(postSplit[1], "PREFIX      ")
-	if len(prefixInfo) > 1 {
-		outFile.WriteString(prefixInfo[1] + "\n")
-		if strings.Contains(prefixInfo[1], "asc=state-channel") {
-			stateChannelCount++
+	lines := strings.Split(outputStr, "\n")
+	writeOutput := "state-channel:"
+	for _, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "PREFIX") {
+			prefix := strings.TrimSpace(strings.TrimPrefix(line, "PREFIX"))
+			if strings.Contains(prefix, "asc=state-channel") {
+				stateChannelCount++
+			}
+			writeOutput += fmt.Sprintf(" PREFIX=%s", prefix)
 			totalCount++
-		} else {
-			totalCount++
+		} else if strings.HasPrefix(strings.TrimSpace(line), "json") {
+			json := strings.TrimSpace(strings.TrimPrefix(line, "json"))
+			writeOutput += fmt.Sprintf(" json=%s", json)
 		}
-	} else {
-		ps := strings.Join(postSplit, "")
-		fmt.Printf("prefix info unexpected = %v post_split=%v\n", prefixInfo, ps)
 	}
+	writeOutput += "\n"
+	outFile.WriteString(writeOutput)
+
 	return stateChannelCount, totalCount
 }
 
