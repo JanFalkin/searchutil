@@ -1,0 +1,6 @@
+data*
+result*
+mp/*.txt
+mp/process-multi
+.vscode
+process
